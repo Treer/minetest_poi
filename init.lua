@@ -150,7 +150,7 @@ function poi.list(name, option)
 	end -- if(idx > 0)
 
 	for key, value in poi.spairs(poi.points) do	-- Build up the List
-		pos, cat = poi.split_pos_cat(value)
+		pos, cat = poi.split_pos_cat_dir(value)
 		if(idx > 0) then
 			if(cat == idx) then
 				if all then
@@ -205,8 +205,8 @@ function poi.set(name, poi_name)
 
 			local value = poi.points[p_name]
 			local pos, cat
-			pos, cat, dir = poi.split_pos_cat(poi.points[p_name])
-			poi.points[p_name] = poi.combine_pos_cat(pos, categorie, dir) -- Changes the Entry
+			pos, cat, dir = poi.split_pos_cat_dir(poi.points[p_name])
+			poi.points[p_name] = poi.combine_pos_cat_dir(pos, categorie, dir) -- Changes the Entry
 			poi.print(name, name .. S(" has changed the POI: ") .. p_name .. S(" at ") .. pos .. S(" Categorie: ") .. poi.get_categoriename(cat) .. S(" to Categorie: ") .. poi.get_categoriename(categorie) .. "\n", log)
 			poi.print(name, "POI: " .. p_name .. S(" at ") .. pos .. S(" in Categorie: ") .. poi.get_categoriename(cat) .. S(" changed to Categorie: ") .. poi.get_categoriename(categorie), green)
 			poi.save()
@@ -232,7 +232,7 @@ function poi.set(name, poi_name)
 		categorie = 1
 	end
 
-	poi.points[p_name] = poi.combine_pos_cat(currpos, categorie, currdir)-- Insert the new Entry
+	poi.points[p_name] = poi.combine_pos_cat_dir(currpos, categorie, currdir)-- Insert the new Entry
 	poi.save() -- and write the new List
 
 	poi.print(name, name .. S(" has set the POI: ") .. p_name .. S(" at ") .. minetest.pos_to_string(currpos) .. S(" Categorie: ") .. "{" .. poi.get_categoriename(categorie) .. "}\n", log)
@@ -294,7 +294,7 @@ function poi.jump(name, poi_name)
 
 	local Position = poi.points[poi_name]
 	local direction
-	Position, _, direction = poi.split_pos_cat(Position)		-- Extract the Position
+	Position, _, direction = poi.split_pos_cat_dir(Position)		-- Extract the Position
 
 	local player = minetest.get_player_by_name(name)
 	lastchoice = ""                                 -- set lastchoice back to zero
@@ -554,9 +554,9 @@ function poi.move(name, poi_name)
 	local player = minetest.get_player_by_name(name)
 	local currpos = player:getpos(name)
 	local currdir = { pitch = player:get_look_vertical(), yaw = player:get_look_horizontal() }
-	local oldpos, cat, dir = poi.split_pos_cat(poi.points[poi_name])
+	local oldpos, cat, dir = poi.split_pos_cat_dir(poi.points[poi_name])
 
-	poi.points[poi_name] = poi.combine_pos_cat(currpos, cat, currdir) -- Write the Position new
+	poi.points[poi_name] = poi.combine_pos_cat_dir(currpos, cat, currdir) -- Write the Position new
 	poi.save() -- and write the List
 
 	poi.print(name, name .. S(" has moved the POI: ") .. poi_name .. S(" at ") .. oldpos ..  S(" to Position: ") .. minetest.pos_to_string(currpos) .. "\n", log)
@@ -650,9 +650,9 @@ function poi.validate(name)
 				end -- if(string.find)
 
 				local pos, cat
-				pos, cat, dir = poi.split_pos_cat(poi.points[key])
+				pos, cat, dir = poi.split_pos_cat_dir(poi.points[key])
 				if( (cat == nil) or (cat > poi.max_categories) or (cat <= 0) )then	-- Invalid Categorienumber found
-					poi.points[key] = poi.combine_pos_cat(pos, 1, dir) -- Changes the Categorienumber to 1
+					poi.points[key] = poi.combine_pos_cat_dir(pos, 1, dir) -- Changes the Categorienumber to 1
 					invalid_cat = invalid_cat + 1
 
 				end -- if(cat ==)
@@ -820,9 +820,9 @@ function poi.split_option(poi_name)
 
 end -- poi.split_option()
 
--- Returns Coordinates, Categorieindex and direction from an Entry
--- direction may be nil, as earlier POIs didn't save this
-function poi.split_pos_cat(position)
+-- Returns Coordinates, CategoryIndex and direction from an Entry,
+-- direction may be nil, as earlier POIs didn't save this.
+function poi.split_pos_cat_dir(position)
 	local pos, cat, dir
 
 	if( (string.find(position,"{")) and (string.find(position, "}"))) then
@@ -843,22 +843,36 @@ function poi.split_pos_cat(position)
 
 	return pos, cat, dir
 
-end -- poi.split_pos_cat()
+end -- poi.split_pos_cat_dir()
 
 
-function poi.combine_pos_cat(position, category, dir)
-
-	local dirStr = ""
-	if dir ~= nil and dir.pitch ~= null and dir.yaw ~= null then
-		dirStr = ", (" .. tonumber(dir.pitch) .. "," .. tonumber(dir.yaw) .. ")"
-	end
+-- category and direction are optional
+function poi.combine_pos_cat_dir(position, category, direction)
 
 	if type(position) == "table" then
 		position = minetest.pos_to_string(position)
 	end
 
+	if category == nil then
+		category = 1
+	end
+
+	local dirStr = poi.direction_to_string(direction) or ""
+	if dirStr ~= "" then
+		dirStr = ", " .. dirStr
+	end
+
 	return position .. dirStr .. "{" .. tonumber(category) .. "}"
-end -- poi.combine_pos_cat()
+end -- poi.combine_pos_cat_dir()
+
+
+-- returns nil if direction is not well formed
+function poi.direction_to_string(direction)
+	if direction ~= nil and direction.pitch ~= null and direction.yaw ~= null then
+		return "(" .. tonumber(direction.pitch) .. "," .. tonumber(direction.yaw) .. ")"
+	end
+	return nil
+end -- poi.direction_to_string()
 
 
 -- return nil, or a table with pitch and yaw
@@ -927,7 +941,7 @@ function poi.get_categorie(poi_name)
 	local value, cat, pos
 
 	value = poi.points[poi_name]
-	pos, cat = poi.split_pos_cat(value)
+	pos, cat = poi.split_pos_cat_dir(value)
 
 	return cat
 
